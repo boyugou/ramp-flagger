@@ -25,6 +25,8 @@ in this repo.
 
 ## How to use it
 
+![The panel after a scan, listing flagged expenses](assets/real.png)
+
 **1. Scan.** Click the floating button. The first click automatically scans your trailing 2
 months of expenses — no extra setup needed.
 
