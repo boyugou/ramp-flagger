@@ -1,5 +1,7 @@
 # Ramp Flagger
 
+![Ramp Flagger](assets/promo.png)
+
 A Chrome extension for [Ramp](https://ramp.com)'s "My expenses" page. It finds which of your
 recent expenses are missing a memo and/or a receipt — determined from the actual content of
 each row, not from Ramp's own "Policy status" icons, which show policy *compliance* rather
