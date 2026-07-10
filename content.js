@@ -606,10 +606,47 @@
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'RESCAN') {
+      mountIfNeeded(); // in case the panel isn't mounted yet on this SPA route
+      if (!panel) return;
       panel.classList.add('ramp-flagger-open');
       startScan(state.months);
     }
   });
 
-  buildShell();
+  // ---------- SPA-aware mounting ----------
+  // Ramp is a client-side-routed single-page app: navigating from the homepage
+  // to the expenses page changes the URL via history.pushState *without a real
+  // document load*, so a content script scoped only to the expenses URL would
+  // never get injected when you arrive that way. Instead this script is
+  // injected across Ramp's whole /home section and mounts/unmounts its own UI
+  // based on the current path, re-checking on every route change.
+  //
+  // Patching history.pushState from a content script's isolated world wouldn't
+  // intercept the page's own calls (different realm), so URL changes are
+  // detected by polling location.href plus listening for popstate.
+  function onExpensesPage() {
+    return /^\/home\/personal-expenses\/all\b/.test(location.pathname);
+  }
+
+  function mountIfNeeded() {
+    if (onExpensesPage()) {
+      if (!root) buildShell();
+    } else if (root) {
+      root.remove();
+      root = null;
+      toggleBtn = null;
+      panel = null;
+    }
+  }
+
+  let lastHref = location.href;
+  function onUrlMaybeChanged() {
+    if (location.href === lastHref) return;
+    lastHref = location.href;
+    mountIfNeeded();
+  }
+
+  window.addEventListener('popstate', onUrlMaybeChanged);
+  setInterval(onUrlMaybeChanged, 500);
+  mountIfNeeded();
 })();

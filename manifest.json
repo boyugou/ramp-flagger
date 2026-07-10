@@ -23,7 +23,10 @@
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
-      "matches": ["https://app.ramp.com/home/personal-expenses/all*"],
+      "matches": [
+        "https://app.ramp.com/home",
+        "https://app.ramp.com/home/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"

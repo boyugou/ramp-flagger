@@ -9,8 +9,9 @@ only write this tool ever performs — everything else, including receipts, is r
 ## Layout
 
 - `manifest.json` — permissions and content-script registration.
-- `content.js` / `content.css` — injected on the expenses page: table scraping, pagination
-  handling, and the floating in-page panel.
+- `content.js` / `content.css` — injected across Ramp's `/home` section; mounts the floating
+  in-page panel only while the URL is the expenses page (see "SPA-aware mounting" below), and
+  does the table scraping, pagination handling, and memo writing there.
 - `background.js` — service worker: persists the last scan to `chrome.storage.local`,
   updates the toolbar badge, and is the only place a scraped URL is passed to
   `chrome.tabs.create` (after validating its scheme/host). Writing a memo doesn't involve
@@ -98,14 +99,44 @@ happen slightly before the display re-renders the saved text, producing a false 
 the timeout is too tight; this was hit empirically once (10s timeout is what's used now,
 after 4s proved too short).
 
+## SPA-aware mounting (read this before touching the manifest match pattern)
+
+Ramp is a client-side-routed single-page app. A content script declared in the manifest is
+injected only on a *real document load* whose URL matches — it is **not** re-injected when
+the app changes the URL via `history.pushState`. So if the match pattern were scoped only to
+`.../personal-expenses/all`, arriving there by clicking through Ramp's own nav from the
+homepage (a pushState route change, no document load) would never inject the script, and the
+floating panel would silently never appear. Landing there via a pasted URL / reload *would*
+work — which is exactly the confusing split that was reported.
+
+The fix: the content script matches Ramp's whole `/home` section (`/home` and `/home/*`),
+which is where users land and where "My expenses" lives, so it's already present in the
+document before any in-app navigation. It then mounts/unmounts its own UI based on
+`location.pathname` (`mountIfNeeded`), re-checking on every route change.
+
+Route changes are detected by **polling `location.href` every 500ms** plus a `popstate`
+listener — *not* by patching `history.pushState`. A content script runs in an isolated JS
+world with its own `window`/`history` binding, so patching `pushState` there would not
+intercept the page's own (main-world) calls. Polling `location` works because `location`
+reflects the shared document URL across worlds.
+
+If you ever need the panel to also appear when navigating in from *outside* `/home` (e.g.
+straight from Vendors or Cards without a reload), widen the match to
+`https://app.ramp.com/*`; the mounting logic already gates on pathname, so nothing else
+changes. It's left at `/home*` to keep the injected surface — and the install-time
+permission prompt — as narrow as still fixes the reported flow.
+
 ## Permissions philosophy
 
-`manifest.json` requests only `"storage"` (for persisting the last scan result), plus
-`host_permissions` scoped to `https://app.ramp.com/home/personal-expenses/all*` — not a
-broader Ramp host pattern. No `"scripting"` permission (writing a memo never leaves the
-current page, so there's nothing to inject into another tab) and no `"tabs"` permission
-(creating/updating/messaging tabs doesn't require it; the host permission already covers
-every URL ever queried). Any scraped `href` is
+`manifest.json` requests only `"storage"` (for persisting the last scan result). The
+content script matches Ramp's `/home` section (`/home` + `/home/*`) — as narrow as the
+SPA-mounting fix allows (see above), not all of `app.ramp.com`. `host_permissions` stays
+scoped to `https://app.ramp.com/home/personal-expenses/all*`, needed only for the popup's
+`chrome.tabs.query({url})`; it deliberately isn't widened to the `/home` section because
+nothing programmatic queries those other URLs. No `"scripting"` permission (writing a memo
+never leaves the current page, so there's nothing to inject into another tab) and no
+`"tabs"` permission (creating/updating/messaging tabs doesn't require it; the host
+permission already covers every URL ever queried). Any scraped `href` is
 re-validated (`protocol === 'https:' && hostname === 'app.ramp.com'`) in both
 `background.js` and `popup.js` immediately before it's passed to `chrome.tabs.create`, even
 though it originates from Ramp's own DOM — defense in depth against a compromised-page

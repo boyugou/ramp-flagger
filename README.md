@@ -88,7 +88,11 @@ not to trust a stale count).
 
 - **Storage** — to remember your last scan's results, so the toolbar popup can show them
   without re-scanning.
-- **Access to `app.ramp.com`'s expenses page only** — not all of Ramp, and no other site.
+- **Access to Ramp's Home section only** (`app.ramp.com/home…`) — not all of Ramp, and no
+  other site. It needs to load across the Home section (rather than just the expenses page)
+  so the on-page panel still appears when you reach expenses by clicking through Ramp's own
+  navigation, not only when you open the URL directly. It stays dormant on every Home page
+  except your expenses list.
 - **No `tabs` or `scripting` permission.** Nothing is ever injected into another tab, and
   opening/reading tabs for the features that need it (the toolbar popup, "open selected")
   doesn't require that broader permission.
